@@ -240,9 +240,9 @@ class PKGBUILDGenerator(object):
             rpkgver = github_rpkgver.lstrip('v')
             url = f"https://github.com/{github_owner}/{github_repo}/releases/download/{github_rpkgver}/{github_repo}_{rpkgver}.tar.gz"
             if github_rpkgver.startswith('v'):
-                source = f"https://github.com/{github_owner}/{github_repo}/releases/download/v${{pkgver}}/${{_pkgname}}_${{_pkgver}}.tar.gz"
+                source = f"https://github.com/{github_owner}/{github_repo}/releases/download/v${{pkgver}}/${{_pkgname}}_${{pkgver}}.tar.gz"
             else:
-                source = f"https://github.com/{github_owner}/{github_repo}/releases/download/${{pkgver}}/${{_pkgname}}_${{_pkgver}}.tar.gz"
+                source = f"https://github.com/{github_owner}/{github_repo}/releases/download/${{pkgver}}/${{_pkgname}}_${{pkgver}}.tar.gz"
         result["source"] = source
         result["rpkgver"] = rpkgver
         config = configparser.ConfigParser()
@@ -429,11 +429,11 @@ class PKGBUILDGenerator(object):
 
     def write_lilac_py(self, filename, desc_dict):
         # currently, we do not generate `lilac.py` for R package from github
+        import_line = '\n'.join([
+            "#!/usr/bin/env python3",
+            "from lilaclib import *\n"
+        ])
         if desc_dict["repo"] != "github":
-            import_line = '\n'.join([
-                "#!/usr/bin/env python3",
-                "from lilaclib import *\n"
-            ])
             pre_build_line = '\n'.join([
                 "def pre_build():",
                 "    for line in edit_file('PKGBUILD'):",
@@ -442,17 +442,24 @@ class PKGBUILDGenerator(object):
                 "        print(line)",
                 "    update_pkgver_and_pkgrel(_G.newver.replace(':', '.').replace('-', '.'))\n"
             ])
-            post_build_line = '\n'.join([
-                "def post_build():",
-                "    git_pkgbuild_commit()\n"
+
+        else:
+            pre_build_line = '\n'.join([
+                "def pre_build():",
+                "    update_pkgver_and_pkgrel(_G.newver.lstrip('v'))\n"
             ])
-            file_content = '\n'.join([
-                import_line,
-                pre_build_line,
-                post_build_line
-            ])
-            with open(filename, "w", newline='\n') as f:
-                f.write(file_content)
+
+        post_build_line = '\n'.join([
+            "def post_build():",
+            "    git_pkgbuild_commit()\n"
+        ])
+        file_content = '\n'.join([
+            import_line,
+            pre_build_line,
+            post_build_line
+        ])
+        with open(filename, "w", newline='\n') as f:
+            f.write(file_content)
 
     def write_pkgbuild(self, filename, desc_dict):
         """
@@ -478,6 +485,12 @@ class PKGBUILDGenerator(object):
             '  R CMD INSTALL ${_pkgname}_${_pkgver}.tar.gz -l "${srcdir}"',
             '}'
         ])
+        if desc_dict["repo"] == "github":
+            build_func = '\n'.join([
+                'build() {',
+                '  R CMD INSTALL ${_pkgname}_${pkgver}.tar.gz -l "${srcdir}"',
+                '}'
+            ])
 
         if desc_dict["license_filename"]:
             package_func = '\n'.join([
@@ -517,14 +530,21 @@ class PKGBUILDGenerator(object):
         build_line = build_func + '\n'
         package_line = package_func
         end_line = '# vim:set ts=2 sw=2 et:\n'
+        # deal with github
+        if desc_dict["repo"] == "github":
+            _pkgver_line = None
+            pkgver_line = f'pkgver={desc_dict["rpkgver"].replace(":", "").replace("-", "")}'
 
         pkgbuild_lines = []
         if systemrequirements_line:
             pkgbuild_lines.append(systemrequirements_line)
         pkgbuild_lines += [
             maintainer_line,
-            _pkgname_line,
-            _pkgver_line,
+            _pkgname_line
+        ]
+        if desc_dict["repo"] != "github":
+            pkgbuild_lines.append(_pkgver_line)
+        pkgbuild_lines += [
             pkgname_line,
             pkgver_line,
             pkgrel_line,
