@@ -124,6 +124,15 @@ class PKGBUILDGenerator(object):
             "ZPL"
         ]
 
+    def has_fortran_src(self, tarfile_object):
+        """
+        return True if Fortran src file is found in the source tarball
+        """
+        for name in tarfile_object.getnames():
+            if name.endswith(".f") or name.endswith(".f90") or name.endswith(".for"):
+                return True
+        return False
+
     def get_bioconductor_ver(self, bio_name, return_idx=False):
         """ get pkg version from Bioconductor
         args:
@@ -210,6 +219,7 @@ class PKGBUILDGenerator(object):
             "depends": ["r"],
             "r_optdepends": [],
             "optdepends": [],
+            "makedepends": [],
             "systemrequirements": None,
             "license": None,
             "license_filename": None,
@@ -262,6 +272,8 @@ class PKGBUILDGenerator(object):
                 f"Failed to get source tarball {rpkgname}-{rpkgver}.tar.gz due to: {r.reason}")
         with tarfile.open(tarfilename) as f:
             f.extract(desc_filename)
+            if self.has_fortran_src(f):
+                result["makedepends"] = ["gcc-fortran"]
         with open(desc_filename, "r") as f:
             config.read_string(f"[{rpkgname}]\n" + f.read())
         if clean:
@@ -480,6 +492,13 @@ class PKGBUILDGenerator(object):
                 '\n'.join(['  ' + _ for _ in desc_dict["optdepends"]]),
                 ')'
             ])
+        makedepends = None
+        if desc_dict["makedepends"]:
+            makedepends = '\n'.join([
+                'makedepends=(',
+                '\n'.join(['  ' + _ for _ in desc_dict["makedepends"]]),
+                ')'
+            ])
         build_func = '\n'.join([
             'build() {',
             '  R CMD INSTALL ${_pkgname}_${_pkgver}.tar.gz -l "${srcdir}"',
@@ -525,6 +544,7 @@ class PKGBUILDGenerator(object):
         license_line = f"license=('{desc_dict['license']}')"
         depends_line = depends
         optdepends_line = optdepends
+        makedepends_line = makedepends
         source_line = f'source=("{desc_dict["source"]}")'
         checksums_line = "sha256sums=('a')\n"
         build_line = build_func + '\n'
@@ -556,6 +576,8 @@ class PKGBUILDGenerator(object):
         ]
         if optdepends_line:
             pkgbuild_lines.append(optdepends_line)
+        if makedepends:
+            pkgbuild_lines.append(makedepends_line)
         pkgbuild_lines += [
             source_line,
             checksums_line,
