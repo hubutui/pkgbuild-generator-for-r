@@ -48,7 +48,8 @@ class PKGBUILDGenerator(object):
         else:
             bioconductor_descs = []
             for url in [f"{self.bioconductor_mirror}/packages/release/bioc/src/contrib/PACKAGES",
-                        f"{self.bioconductor_mirror}/packages/release/data/annotation/src/contrib/PACKAGES"
+                        f"{self.bioconductor_mirror}/packages/release/data/annotation/src/contrib/PACKAGES",
+                        f"{self.bioconductor_mirror}/packages/release/data/experiment/src/contrib/PACKAGES"
                         ]:
                 r = requests.get(url)
                 if r.status_code == requests.codes.ok:
@@ -234,6 +235,9 @@ class PKGBUILDGenerator(object):
             elif idx == 1:
                 url = f"{self.bioconductor_mirror}/packages/release/data/annotation/src/contrib/{rpkgname}_{rpkgver}.tar.gz"
                 source = "https://bioconductor.org/packages/release/data/annotation/src/contrib/${_pkgname}_${_pkgver}.tar.gz"
+            elif idx == 2:
+                url = f"{self.bioconductor_mirror}/packages/release/data/experiment/src/contrib/{rpkgname}_{rpkgver}.tar.gz"
+                source = "https://bioconductor.org/packages/release/data/experiment/src/contrib/${_pkgname}_${_pkgver}.tar.gz"
             result["project_url"] = 'https://bioconductor.org/packages/${_pkgname}'
         elif repo == "cran":
             rpkgver = self.get_cran_ver(rpkgname)
