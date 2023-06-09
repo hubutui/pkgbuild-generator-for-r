@@ -426,9 +426,16 @@ class PKGBUILDGenerator(object):
                     "source": "rpkgs",
                     "pkgname": desc_dict["rpkgname"],
                     "repo": desc_dict["repo"]
-                }，
+                },
                 {
                     "alias": "r"
+                },
+                {
+                    "source": "alpm",
+                    "alpm": "protobuf",
+                    "repo": "extra",
+                    "provided": "libprotobuf.so",
+                    "strip_release": "true"
                 }
             ]
         }
@@ -443,6 +450,8 @@ class PKGBUILDGenerator(object):
             yaml_dict["repo_depends"] = repo_depends
         with open(filename, "w", newline='\n') as f:
             yaml.safe_dump(yaml_dict, f)
+        # run prettier to make pretty yaml
+        os.system(f'prettier -w {filename}')
         # add build_script
         with open(filename, 'r') as f:  
             lines = f.readlines() 
@@ -451,12 +460,10 @@ class PKGBUILDGenerator(object):
                 if 'update_on' in line:  
                     index = i  
                     break  
-            lines.insert(index, 'post_build_script: |\n  git_pkgbuild_commit()\n')  
+            lines.insert(index, "pre_build_script: |\n  for line in edit_file('PKGBUILD'):\n    if line.startswith('_pkgver='):\n      line = f'_pkgver={_G.newver}'\n    print(line)\n  update_pkgver_and_pkgrel(_G.newver.replace(':', '.').replace('-', '.'))\npost_build_script: |\n  git_pkgbuild_commit()\n")  
             with open(filename, 'w') as f:  
                 f.writelines(lines)
-        # run prettier to make pretty yaml
-        os.system(f'prettier -w {filename}')
-
+                
     def write_pkgbuild(self, filename, desc_dict):
         """
         generate the PKGBUILD file based on information parsed from DESCRIPTION file
