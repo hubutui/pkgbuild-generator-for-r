@@ -423,9 +423,12 @@ class PKGBUILDGenerator(object):
             "build_prefix": "extra-x86_64",
             "update_on": [
                 {
-                    "source": "regex",
-                    "regex": f'{desc_dict["rpkgname"]}_([\\d._-]+).tar.gz',
-                    "url": url
+                    "source": "rpkgs",
+                    "pkgname": desc_dict["rpkgname"],
+                    "repo": desc_dict["repo"]
+                }，
+                {
+                    "alias": "r"
                 }
             ]
         }
@@ -440,42 +443,19 @@ class PKGBUILDGenerator(object):
             yaml_dict["repo_depends"] = repo_depends
         with open(filename, "w", newline='\n') as f:
             yaml.safe_dump(yaml_dict, f)
+        # add build_script
+        with open(filename, 'r') as f:  
+            lines = f.readlines() 
+            index = 0  
+            for i, line in enumerate(lines):  
+                if 'update_on' in line:  
+                    index = i  
+                    break  
+            lines.insert(index, 'post_build_script: |\n  git_pkgbuild_commit()\n')  
+            with open(filename, 'w') as f:  
+                f.writelines(lines)
         # run prettier to make pretty yaml
         os.system(f'prettier -w {filename}')
-
-    def write_lilac_py(self, filename, desc_dict):
-        # currently, we do not generate `lilac.py` for R package from github
-        import_line = '\n'.join([
-            "#!/usr/bin/env python3",
-            "from lilaclib import *\n"
-        ])
-        if desc_dict["repo"] != "github":
-            pre_build_line = '\n'.join([
-                "def pre_build():",
-                "    for line in edit_file('PKGBUILD'):",
-                "        if line.startswith('_pkgver='):",
-                "            line = f'_pkgver={_G.newver}'",
-                "        print(line)",
-                "    update_pkgver_and_pkgrel(_G.newver.replace(':', '.').replace('-', '.'))\n"
-            ])
-
-        else:
-            pre_build_line = '\n'.join([
-                "def pre_build():",
-                "    update_pkgver_and_pkgrel(_G.newver.lstrip('v'))\n"
-            ])
-
-        post_build_line = '\n'.join([
-            "def post_build():",
-            "    git_pkgbuild_commit()\n"
-        ])
-        file_content = '\n'.join([
-            import_line,
-            pre_build_line,
-            post_build_line
-        ])
-        with open(filename, "w", newline='\n') as f:
-            f.write(file_content)
 
     def write_pkgbuild(self, filename, desc_dict):
         """
@@ -630,7 +610,6 @@ class PKGBUILDGenerator(object):
         os.makedirs(osp.join(destdir, pkgname), exist_ok=True)
         self.write_pkgbuild(pkgbuild_filename, desc_dict)
         self.write_lilac_yaml(lilac_yaml_filename, desc_dict)
-        self.write_lilac_py(lilac_py_filename, desc_dict)
         if updpkgsums:
             if verbose:
                 print("updating source checksums")
