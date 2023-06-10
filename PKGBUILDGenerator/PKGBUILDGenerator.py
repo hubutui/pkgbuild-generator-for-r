@@ -429,13 +429,6 @@ class PKGBUILDGenerator(object):
                 },
                 {
                     "alias": "r"
-                },
-                {
-                    "source": "alpm",
-                    "alpm": "protobuf",
-                    "repo": "extra",
-                    "provided": "libprotobuf.so",
-                    "strip_release": "true"
                 }
             ]
         }
